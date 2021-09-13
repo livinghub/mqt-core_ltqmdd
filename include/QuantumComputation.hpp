@@ -183,6 +183,8 @@ namespace qc {
 		}
 
 		virtual dd::Edge buildFunctionality(std::unique_ptr<dd::Package>& dd);
+		//virtual dd::Edge buildFunctionalityMin(std::unique_ptr<dd::Package>& dd);
+		virtual dd::Edge buildFunctionalityMin(std::unique_ptr<dd::Package>& dd);
 		virtual dd::Edge simulate(const dd::Edge& in, std::unique_ptr<dd::Package>& dd);
 
 		/// Obtain vector/matrix entry for row i (and column j). Does not include common factor e.w!

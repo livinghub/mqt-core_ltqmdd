@@ -705,6 +705,90 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 		return e;
 	}
 
+	//编译是采用动态最小化，默认方法为sifting
+	dd::Edge QuantumComputation::buildFunctionalityMin(std::unique_ptr<dd::Package>& dd) {
+		unsigned int threshold(1000), esize(0);
+		permutationMap newMap;
+		dd::Edge newdd;
+
+
+		if (nqubits + nancillae == 0)
+			return dd->DDone;
+		
+		std::array<short, MAX_QUBITS> line{};
+		line.fill(LINE_DEFAULT);
+		permutationMap map = initialLayout;
+		dd->setMode(dd::Matrix);
+		dd::Edge e = createInitialMatrix(dd);
+
+		//动态最小化
+		// dd::Edge newdd;
+		// permutationMap newMap;
+
+		for (auto & op : ops) {
+			//拿出一个新的dd
+			newMap = initialLayout;
+			newdd = op->getDD(dd, line, newMap);
+			std::clog<<std::endl<<"新dd的大小:"<<dd->size(newdd)<<std::endl;
+			//newdd = dd->qmdd2ltqmdd(newdd, newMap, dd->Movetab);
+			//dd->qmdd2ltqmdd(newdd, newMap);
+			std::clog<<std::endl<<"qmdd->ltqmdd转换后:"<<dd->size(newdd)<<std::endl;
+			// printPermutationMap(map);
+			//printPermutationMap(newMap);
+		
+			dd::Edge tmp;
+			if(newMap == map || 1) {
+				tmp = dd->multiply(newdd, e);
+				std::clog<<std::endl<<"乘法后的size:"<<dd->size(tmp)<<std::endl;
+			} else {
+				printPermutationMap(map);
+				printPermutationMap(newMap);
+				throw std::logic_error("两个DD变量序不一致，不能执行乘法，请检查");
+			}
+			
+			// auto tmp = dd->multiply(op->getDD(dd, line, map), e);
+
+			dd->incRef(tmp);
+			dd->decRef(e);
+			e = tmp;
+
+			dd->garbageCollect();
+
+			
+			if(dd->size(e) > threshold)
+			{
+				// esize = dd->size(e);
+				// threshold = esize*0.6;
+				//e = reduceAncillae(e, dd);
+				e = dd->dynamicReorder(e, map, dd::DynamicReorderingStrategy::linearSift);
+				//e = dd->dynamicReorder(e, map, dd::DynamicReorderingStrategy::Sifting);
+				//dd->printLTMap(map);
+				esize = dd->size(e);
+				threshold = esize*5;
+				std::cout << "**********动态调用********" <<  std::endl << "阀值：" << threshold << std::endl;
+				//printPermutationMap(map);
+				std::cout<<std::endl;
+				//dd->printInformation();
+				
+			}
+			
+		}
+		std::clog << std::endl << "动态最小化结束" << std::endl << "大小为：" << dd->size(e) << std::endl;
+		printPermutationMap(outputPermutation);
+		outputPermutation = map;
+
+		// correct permutation if necessary
+		changePermutation(e, map, outputPermutation, line, dd);
+		//changePermutation(e, outputPermutation, map, line, dd);
+		std::clog << "大小1为：" << dd->size(e) << std::endl;
+		printPermutationMap(map);
+		printPermutationMap(outputPermutation);
+		e = reduceAncillae(e, dd);
+		std::clog << "大小2为：" << dd->size(e) << std::endl;
+
+		return e;
+	}
+
 	dd::Edge QuantumComputation::simulate(const dd::Edge& in, std::unique_ptr<dd::Package>& dd) {
 		// measurements are currently not supported here
 		std::array<short, MAX_QUBITS> line{};
