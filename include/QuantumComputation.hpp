@@ -183,8 +183,11 @@ namespace qc {
 		}
 
 		virtual dd::Edge buildFunctionality(std::unique_ptr<dd::Package>& dd);
+		virtual dd::Edge buildFunctionality(std::unique_ptr<dd::Package>& dd, permutationMap map);
 		//virtual dd::Edge buildFunctionalityMin(std::unique_ptr<dd::Package>& dd);
 		virtual dd::Edge buildFunctionalityMin(std::unique_ptr<dd::Package>& dd);
+		virtual dd::Edge buildFunDynSift(std::unique_ptr<dd::Package>& dd, permutationMap& theMap);
+		virtual dd::Edge buildFunDynLinSift(std::unique_ptr<dd::Package>& dd, permutationMap& theMap);
 		virtual dd::Edge simulate(const dd::Edge& in, std::unique_ptr<dd::Package>& dd);
 
 		/// Obtain vector/matrix entry for row i (and column j). Does not include common factor e.w!

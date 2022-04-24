@@ -42,8 +42,10 @@ int qc::QuantumComputation::readTFCHeader(std::istream& is, std::map<std::string
 		}
 
 		// header read complete
-		if (cmd == "BEGIN" || cmd == "begin")
+		if (cmd == "BEGIN" || cmd == "begin") {
 			break;
+		}
+			
 
 		if (cmd == ".v") {
 			is >> std::ws;
@@ -62,14 +64,15 @@ int qc::QuantumComputation::readTFCHeader(std::istream& is, std::map<std::string
 				if (std::find(variables.begin(), variables.end(), variable) != variables.end()) {
 					inputs.emplace_back(variable);
 				} else {
-					throw QFRException("[tfc parser] l:" + std::to_string(line) + " msg: Unknown variable in input statement: " + cmd);
+					throw QFRException("[tfc parser] l:" + std::to_string(line) + " msg0: Unknown variable in input statement: " + cmd);
 				}
 				identifier.erase(0, pos+1);
 			}
+			// identifier.erase(identifier.size()-1);
 			if (std::find(variables.begin(), variables.end(), identifier) != variables.end()) {
 				inputs.emplace_back(identifier);
 			} else {
-				throw QFRException("[tfc parser] l:" + std::to_string(line) + " msg: Unknown variable in input statement: " + cmd);
+				throw QFRException("[tfc parser] l:" + std::to_string(line) + " msg1: Unknown variable in input statement: " + cmd);
 			}
 		} else if (cmd == ".o") {
 			is >> std::ws;
