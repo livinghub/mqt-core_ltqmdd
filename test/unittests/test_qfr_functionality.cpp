@@ -1717,3 +1717,22 @@ TEST_F(QFRFunctionality, CircuitToOperation) {
     EXPECT_EQ(op2->getNqubits(), 2U);
     EXPECT_TRUE(qc.empty());
 }
+
+TEST_F(QFRFunctionality, Test) {
+    QuantumComputation qc(2);
+    const auto* const  qasm = R"(
+        OPENQASM 2.0;
+        include "qelib1.inc";
+        qreg q[2];
+        creg c[2];
+        rz(pi/8) q[0];
+        p(pi/8) q[1];
+        crz(pi/8) q[0],q[1];
+        cp(pi/8) q[0],q[1];
+    )";
+    std::stringstream  ss;
+    ss << qasm;
+    qc.import(ss, qc::Format::OpenQASM);
+
+    std::cout << qc << std::endl;
+}

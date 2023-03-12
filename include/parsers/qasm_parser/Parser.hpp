@@ -9,6 +9,7 @@
 #include "Scanner.hpp"
 #include "operations/CompoundOperation.hpp"
 #include "operations/NonUnitaryOperation.hpp"
+#include "operations/OpType.hpp"
 #include "operations/StandardOperation.hpp"
 
 #include <cmath>
@@ -61,7 +62,7 @@ namespace qasm {
             std::shared_ptr<Expr> op2 = nullptr;
             std::string           id;
 
-            explicit Expr(Kind k, qc::fp n = 0., std::shared_ptr<Expr> operation1 = nullptr, std::shared_ptr<Expr> operation2 = nullptr, std::string identifier = ""):
+            explicit Expr(const Kind k, const qc::fp n = 0., std::shared_ptr<Expr> operation1 = nullptr, std::shared_ptr<Expr> operation2 = nullptr, std::string identifier = ""):
                 num(n), kind(k), op1(std::move(operation1)), op2(std::move(operation2)), id(std::move(identifier)) {}
             Expr(const Expr& expr):
                 num(expr.num), kind(expr.kind), id(expr.id) {
@@ -94,6 +95,13 @@ namespace qasm {
             virtual ~BasisGate() = default;
         };
 
+        struct GPhaseGate: public BasisGate {
+            std::shared_ptr<Expr> lambda = nullptr;
+
+            explicit GPhaseGate(std::shared_ptr<Expr> l):
+                lambda(std::move(l)) {}
+        };
+
         struct CUgate: public BasisGate {
             std::shared_ptr<Expr>    theta  = nullptr;
             std::shared_ptr<Expr>    phi    = nullptr;
@@ -120,7 +128,7 @@ namespace qasm {
             std::shared_ptr<Expr> phi;
             std::shared_ptr<Expr> theta;
 
-            explicit SingleQubitGate(std::string targ, qc::OpType typ = qc::U3, std::shared_ptr<Expr> l = nullptr, std::shared_ptr<Expr> p = nullptr, std::shared_ptr<Expr> t = nullptr):
+            explicit SingleQubitGate(std::string targ, const qc::OpType typ = qc::U3, std::shared_ptr<Expr> l = nullptr, std::shared_ptr<Expr> p = nullptr, std::shared_ptr<Expr> t = nullptr):
                 target(std::move(targ)), type(typ), lambda(std::move(l)), phi(std::move(p)), theta(std::move(t)) {}
         };
 
@@ -153,7 +161,9 @@ namespace qasm {
         std::shared_ptr<Expr> exponentiation();
         std::shared_ptr<Expr> factor();
         std::shared_ptr<Expr> term();
-        std::shared_ptr<Expr> exp();
+        std::shared_ptr<Expr> expr();
+
+        std::unique_ptr<qc::Operation> knownGate(qc::OpType opType, std::size_t numControls, std::size_t numTargets, std::size_t numParameters);
 
         static std::shared_ptr<Expr> rewriteExpr(const std::shared_ptr<Expr>& expr, std::map<std::string, std::shared_ptr<Expr>>& exprMap);
 

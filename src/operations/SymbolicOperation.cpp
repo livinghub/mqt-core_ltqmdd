@@ -7,7 +7,7 @@
 
 namespace qc {
 
-    void SymbolicOperation::storeSymbolOrNumber(const SymbolOrNumber& param, std::size_t i) {
+    void SymbolicOperation::storeSymbolOrNumber(const SymbolOrNumber& param, const std::size_t i) {
         if (std::holds_alternative<double>(param)) {
             parameter.at(i) = std::get<double>(param);
         } else {
@@ -179,11 +179,14 @@ namespace qc {
         }
     }
 
-    void SymbolicOperation::setup(const std::size_t nq, const SymbolOrNumber& par0, const SymbolOrNumber& par1, const SymbolOrNumber& par2, const Qubit startingQubit) {
-        nqubits = nq;
-        storeSymbolOrNumber(par0, 0);
-        storeSymbolOrNumber(par1, 1);
-        storeSymbolOrNumber(par2, 2);
+    void SymbolicOperation::setup(const std::size_t nq, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit) {
+        nqubits              = nq;
+        const auto numParams = params.size();
+        parameter.resize(numParams);
+        symbolicParameter.resize(numParams);
+        for (std::size_t i = 0; i < numParams; ++i) {
+            storeSymbolOrNumber(params[i], i);
+        }
         startQubit = startingQubit;
         checkSymbolicUgate();
         setName();
@@ -196,41 +199,41 @@ namespace qc {
                           symOrNum);
     }
 
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Qubit target, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Qubit target, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit) {
         type = g;
-        setup(nq, lambda, phi, theta, startingQubit);
+        setup(nq, params, startingQubit);
         targets.emplace_back(target);
     }
 
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Targets& targ, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Targets& targ, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit) {
         type = g;
-        setup(nq, lambda, phi, theta, startingQubit);
+        setup(nq, params, startingQubit);
         targets = targ;
     }
 
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Control control, const Qubit target, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit):
-        SymbolicOperation(nq, target, g, lambda, phi, theta, startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Control control, const Qubit target, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit):
+        SymbolicOperation(nq, target, g, params, startingQubit) {
         controls.insert(control);
     }
 
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Control control, const Targets& targ, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit):
-        SymbolicOperation(nq, targ, g, lambda, phi, theta, startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Control control, const Targets& targ, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit):
+        SymbolicOperation(nq, targ, g, params, startingQubit) {
         controls.insert(control);
     }
 
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Controls& c, const Qubit target, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit):
-        SymbolicOperation(nq, target, g, lambda, phi, theta, startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Controls& c, const Qubit target, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit):
+        SymbolicOperation(nq, target, g, params, startingQubit) {
         controls = c;
     }
 
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Controls& c, const Targets& targ, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit):
-        SymbolicOperation(nq, targ, g, lambda, phi, theta, startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Controls& c, const Targets& targ, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit):
+        SymbolicOperation(nq, targ, g, params, startingQubit) {
         controls = c;
     }
 
     // MCF (cSWAP), Peres, paramterized two target Constructor
-    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Controls& c, const Qubit target0, const Qubit target1, const OpType g, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta, const Qubit startingQubit):
-        SymbolicOperation(nq, c, {target0, target1}, g, lambda, phi, theta, startingQubit) {
+    SymbolicOperation::SymbolicOperation(const std::size_t nq, const Controls& c, const Qubit target0, const Qubit target1, const OpType g, const std::vector<SymbolOrNumber>& params, const Qubit startingQubit):
+        SymbolicOperation(nq, c, {target0, target1}, g, params, startingQubit) {
     }
 
     bool SymbolicOperation::equals(const Operation& op, const Permutation& perm1, const Permutation& perm2) const {
@@ -262,10 +265,13 @@ namespace qc {
     }
 
     StandardOperation SymbolicOperation::getInstantiatedOperation(const VariableAssignment& assignment) const {
-        auto lambda = getInstantiation(getParameter(0), assignment);
-        auto phi    = getInstantiation(getParameter(1), assignment);
-        auto theta  = getInstantiation(getParameter(2), assignment);
-        return {nqubits, targets, type, lambda, phi, theta, startQubit};
+        std::vector<fp> parameters;
+        const auto      size = symbolicParameter.size();
+        parameters.reserve(size);
+        for (std::size_t i = 0; i < size; ++i) {
+            parameters.emplace_back(getInstantiation(getParameter(i), assignment));
+        }
+        return {nqubits, targets, type, parameters, startQubit};
     }
 
     // Instantiates this Operation

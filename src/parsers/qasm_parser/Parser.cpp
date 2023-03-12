@@ -5,6 +5,12 @@
 
 #include "parsers/qasm_parser/Parser.hpp"
 
+#include "Definitions.hpp"
+#include "operations/Control.hpp"
+
+#include <memory>
+#include <vector>
+
 namespace qasm {
 
     /***
@@ -40,15 +46,15 @@ namespace qasm {
         }
         if (sym == Token::Kind::Lpar) {
             scan();
-            auto x = exp();
+            auto x = expr();
             check(Token::Kind::Rpar);
             return x;
         }
         if (unaryops.find(sym) != unaryops.end()) {
-            auto op = sym;
+            const auto op = sym;
             scan();
             check(Token::Kind::Lpar);
-            auto x = exp();
+            auto x = expr();
             check(Token::Kind::Rpar);
             if (x->kind == Expr::Kind::Number) {
                 if (op == Token::Kind::Sin) {
@@ -108,7 +114,7 @@ namespace qasm {
     std::shared_ptr<Parser::Expr> Parser::term() {
         auto x = factor();
         while (sym == Token::Kind::Times || sym == Token::Kind::Div) {
-            auto op = sym;
+            const auto op = sym;
             scan();
             auto y = factor();
             if (op == Token::Kind::Times) {
@@ -128,7 +134,7 @@ namespace qasm {
         return x;
     }
 
-    std::shared_ptr<Parser::Expr> Parser::exp() {
+    std::shared_ptr<Parser::Expr> Parser::expr() {
         std::shared_ptr<Expr> x{};
         if (sym == Token::Kind::Minus) {
             scan();
@@ -143,7 +149,7 @@ namespace qasm {
         }
 
         while (sym == Token::Kind::Plus || sym == Token::Kind::Minus) {
-            auto op = sym;
+            const auto op = sym;
             scan();
             auto y = term();
             if (op == Token::Kind::Plus) {
@@ -242,16 +248,15 @@ namespace qasm {
 
     void Parser::handleComment() {
         // check if this comment provides any I/O mapping information
-        auto&& initial = checkForInitialLayout(t.str);
-        if (!initial.empty()) {
+        if (const auto initial = checkForInitialLayout(t.str); !initial.empty()) {
             if (!initialLayout.empty()) {
                 error("Multiple initial layout specifications found.");
             } else {
                 initialLayout = initial;
             }
         }
-        auto&& output = checkForOutputPermutation(t.str);
-        if (!output.empty()) {
+
+        if (const auto output = checkForOutputPermutation(t.str); !output.empty()) {
             if (!outputPermutation.empty()) {
                 error("Multiple output permutation specifications found.");
             } else {
@@ -261,12 +266,12 @@ namespace qasm {
     }
 
     qc::Permutation Parser::checkForInitialLayout(std::string comment) {
-        static auto     initialLayoutRegex = std::regex("i (\\d+ )*(\\d+)");
-        static auto     qubitRegex         = std::regex("\\d+");
-        qc::Permutation initial{};
-        if (std::regex_search(comment, initialLayoutRegex)) {
+        static const auto INITIAL_LAYOUT_REGEX = std::regex("i (\\d+ )*(\\d+)");
+        static const auto QUBIT_REGEX          = std::regex("\\d+");
+        qc::Permutation   initial{};
+        if (std::regex_search(comment, INITIAL_LAYOUT_REGEX)) {
             qc::Qubit logicalQubit = 0;
-            for (std::smatch m; std::regex_search(comment, m, qubitRegex); comment = m.suffix()) {
+            for (std::smatch m; std::regex_search(comment, m, QUBIT_REGEX); comment = m.suffix()) {
                 auto physicalQubit = static_cast<qc::Qubit>(std::stoul(m.str()));
                 initial.insert({physicalQubit, logicalQubit});
                 ++logicalQubit;
@@ -276,12 +281,12 @@ namespace qasm {
     }
 
     qc::Permutation Parser::checkForOutputPermutation(std::string comment) {
-        static auto     outputPermutationRegex = std::regex("o (\\d+ )*(\\d+)");
-        static auto     qubitRegex             = std::regex("\\d+");
-        qc::Permutation output{};
-        if (std::regex_search(comment, outputPermutationRegex)) {
+        static const auto OUTPUT_PERMUTATION_REGEX = std::regex("o (\\d+ )*(\\d+)");
+        static const auto QUBIT_REGEX              = std::regex("\\d+");
+        qc::Permutation   output{};
+        if (std::regex_search(comment, OUTPUT_PERMUTATION_REGEX)) {
             qc::Qubit logicalQubit = 0;
-            for (std::smatch m; std::regex_search(comment, m, qubitRegex); comment = m.suffix()) {
+            for (std::smatch m; std::regex_search(comment, m, QUBIT_REGEX); comment = m.suffix()) {
                 auto physicalQubit = static_cast<qc::Qubit>(std::stoul(m.str()));
                 output.insert({physicalQubit, logicalQubit});
                 ++logicalQubit;
@@ -299,7 +304,7 @@ namespace qasm {
         sym = la.kind;
     }
 
-    void Parser::check(Token::Kind expected) {
+    void Parser::check(const Token::Kind expected) {
         while (sym == Token::Kind::Comment) {
             scan();
             handleComment();
@@ -322,7 +327,7 @@ namespace qasm {
         if (sym == Token::Kind::Lbrack) {
             scan();
             check(Token::Kind::Nninteger);
-            auto offset = static_cast<std::size_t>(t.val);
+            const auto offset = static_cast<std::size_t>(t.val);
             check(Token::Kind::Rbrack);
             return std::make_pair(qregs[s].first + offset, 1);
         }
@@ -339,7 +344,7 @@ namespace qasm {
         if (sym == Token::Kind::Lbrack) {
             scan();
             check(Token::Kind::Nninteger);
-            auto offset = static_cast<std::size_t>(t.val);
+            const auto offset = static_cast<std::size_t>(t.val);
             check(Token::Kind::Rbrack);
             return std::make_pair(cregs[s].first + offset, 1);
         }
@@ -348,10 +353,10 @@ namespace qasm {
     }
 
     void Parser::expList(std::vector<std::shared_ptr<Parser::Expr>>& expressions) {
-        expressions.emplace_back(exp());
+        expressions.emplace_back(expr());
         while (sym == Token::Kind::Comma) {
             scan();
-            expressions.emplace_back(exp());
+            expressions.emplace_back(expr());
         }
     }
 
@@ -377,11 +382,11 @@ namespace qasm {
         if (sym == Token::Kind::Ugate) {
             scan();
             check(Token::Kind::Lpar);
-            const auto theta = exp();
+            const auto theta = expr();
             check(Token::Kind::Comma);
-            const auto phi = exp();
+            const auto phi = expr();
             check(Token::Kind::Comma);
-            const auto lambda = exp();
+            const auto lambda = expr();
             check(Token::Kind::Rpar);
             auto target = argumentQreg();
             check(Token::Kind::Semicolon);
@@ -443,7 +448,7 @@ namespace qasm {
         if (sym == Token::Kind::Mcphase) {
             scan();
             check(Token::Kind::Lpar);
-            const auto lambda = exp();
+            const auto lambda = expr();
             check(Token::Kind::Rpar);
 
             std::vector<qc::QuantumRegister> registers{};
@@ -947,11 +952,11 @@ namespace qasm {
             if (sym == Token::Kind::Ugate) {
                 scan();
                 check(Token::Kind::Lpar);
-                auto theta = exp();
+                auto theta = expr();
                 check(Token::Kind::Comma);
-                auto phi = exp();
+                auto phi = expr();
                 check(Token::Kind::Comma);
-                auto lambda = exp();
+                auto lambda = expr();
                 check(Token::Kind::Rpar);
                 check(Token::Kind::Identifier);
                 gate.gates.push_back(std::make_shared<SingleQubitGate>(t.str, qc::U3, lambda, phi, theta));
@@ -1011,7 +1016,7 @@ namespace qasm {
             } else if (sym == Token::Kind::Mcphase) {
                 scan();
                 check(Token::Kind::Lpar);
-                auto lambda = exp();
+                auto lambda = expr();
                 check(Token::Kind::Rpar);
                 std::vector<std::string> arguments{};
                 check(Token::Kind::Identifier);
@@ -1220,5 +1225,85 @@ namespace qasm {
             return std::make_unique<qc::NonUnitaryOperation>(nqubits, qubits);
         }
         error("No valid Qop: " + t.str);
+    }
+
+    std::unique_ptr<qc::Operation> Parser::knownGate(const qc::OpType opType, const std::size_t numControls, const std::size_t numTargets, const std::size_t numParameters) {
+        scan();
+        // if the gate has parameters, then parse them first
+        std::vector<qc::fp> parameters{};
+        if (numParameters > 0) {
+            check(Token::Kind::Lpar);
+            for (std::size_t i = 0; i < numParameters; ++i) {
+                parameters.emplace_back(expr()->num);
+                if (i < (numParameters - 1)) {
+                    check(Token::Kind::Comma);
+                }
+            }
+            check(Token::Kind::Rpar);
+        }
+
+        // if the gate has controls, collect them next
+        std::vector<qc::QuantumRegister> controlRegisters{};
+        if (numControls > 0) {
+            for (std::size_t i = 0; i < numControls; ++i) {
+                controlRegisters.emplace_back(argumentQreg());
+                if (i < (numControls - 1)) {
+                    check(Token::Kind::Comma);
+                }
+            }
+        }
+
+        // if the gate has targets, collect them next
+        std::vector<qc::QuantumRegister> targetRegisters{};
+        if (numTargets > 0) {
+            if (numControls > 0U) {
+                check(Token::Kind::Comma);
+            }
+            for (std::size_t i = 0; i < numTargets; ++i) {
+                targetRegisters.emplace_back(argumentQreg());
+                if (i < (numTargets - 1)) {
+                    check(Token::Kind::Comma);
+                }
+            }
+        }
+        check(Token::Kind::Semicolon);
+
+        // handle case where there are no controls
+        if (numControls == 0) {
+            // there hardly are gates with no controls and no targets, but we handle them anyway
+            if (numTargets == 0) {
+                return std::make_unique<qc::StandardOperation>(nqubits, qc::Controls{}, qc::Targets{}, opType, parameters);
+            }
+
+            // handle single-qubit gates
+            if (numTargets == 1) {
+                const auto& [startQubit, length] = targetRegisters.front();
+                if (length == 1) {
+                    return std::make_unique<qc::StandardOperation>(nqubits, startQubit, opType, parameters);
+                }
+                auto gate = qc::CompoundOperation(nqubits);
+                for (std::size_t i = 0; i < length; ++i) {
+                    gate.emplace_back<qc::StandardOperation>(nqubits, static_cast<qc::Qubit>(startQubit + i), opType, parameters);
+                }
+                return std::make_unique<qc::CompoundOperation>(std::move(gate));
+            }
+
+            // handle multi-target gates
+            qc::Targets targets{};
+            for (const auto& [startQubit, length]: targetRegisters) {
+                if (length != 1) {
+                    error("Broadcasting not supported for multi-target gates.");
+                }
+
+                if (std::find(targets.begin(), targets.end(), startQubit) != targets.end()) {
+                    error("Duplicate target qubit in multi-target gate.");
+                }
+
+                targets.emplace_back(startQubit);
+            }
+            return std::make_unique<qc::StandardOperation>(nqubits, targets, opType, parameters);
+        }
+
+        // todo: handle the controlled case
     }
 } // namespace qasm

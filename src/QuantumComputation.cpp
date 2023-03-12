@@ -980,97 +980,97 @@ namespace qc {
     void QuantumComputation::u3(Qubit target, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta) {
         checkQubitRange(target);
         addVariables(lambda, phi, theta);
-        emplace_back<SymbolicOperation>(getNqubits(), target, qc::U3, lambda, phi, theta);
+        emplace_back<SymbolicOperation>(getNqubits(), target, qc::U3, std::vector{lambda, phi, theta});
     }
     void QuantumComputation::u3(Qubit target, const Control& control, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta) {
         checkQubitRange(target, control);
         addVariables(lambda, phi, theta);
-        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::U3, lambda, phi, theta);
+        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::U3, std::vector{lambda, phi, theta});
     }
     void QuantumComputation::u3(Qubit target, const Controls& controls, const SymbolOrNumber& lambda, const SymbolOrNumber& phi, const SymbolOrNumber& theta) {
         checkQubitRange(target, controls);
         addVariables(lambda, phi, theta);
-        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::U3, lambda, phi, theta);
+        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::U3, std::vector{lambda, phi, theta});
     }
 
     void QuantumComputation::u2(Qubit target, const SymbolOrNumber& lambda, const SymbolOrNumber& phi) {
         checkQubitRange(target);
         addVariables(lambda, phi);
-        emplace_back<SymbolicOperation>(getNqubits(), target, qc::U2, lambda, phi);
+        emplace_back<SymbolicOperation>(getNqubits(), target, qc::U2, std::vector{lambda, phi});
     }
     void QuantumComputation::u2(Qubit target, const Control& control, const SymbolOrNumber& lambda, const SymbolOrNumber& phi) {
         checkQubitRange(target, control);
         addVariables(lambda, phi);
-        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::U2, lambda, phi);
+        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::U2, std::vector{lambda, phi});
     }
     void QuantumComputation::u2(Qubit target, const Controls& controls, const SymbolOrNumber& lambda, const SymbolOrNumber& phi) {
         checkQubitRange(target, controls);
         addVariables(lambda, phi);
-        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::U2, lambda, phi);
+        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::U2, std::vector{lambda, phi});
     }
 
     void QuantumComputation::phase(Qubit target, const SymbolOrNumber& lambda) {
         checkQubitRange(target);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), target, qc::Phase, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), target, qc::Phase, std::vector{lambda});
     }
     void QuantumComputation::phase(Qubit target, const Control& control, const SymbolOrNumber& lambda) {
         checkQubitRange(target, control);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::Phase, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::Phase, std::vector{lambda});
     }
     void QuantumComputation::phase(Qubit target, const Controls& controls, const SymbolOrNumber& lambda) {
         checkQubitRange(target, controls);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::Phase, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::Phase, std::vector{lambda});
     }
 
     void QuantumComputation::rx(Qubit target, const SymbolOrNumber& lambda) {
         checkQubitRange(target);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), target, qc::RX, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), target, qc::RX, std::vector{lambda});
     }
     void QuantumComputation::rx(Qubit target, const Control& control, const SymbolOrNumber& lambda) {
         checkQubitRange(target, control);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::RX, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::RX, std::vector{lambda});
     }
     void QuantumComputation::rx(Qubit target, const Controls& controls, const SymbolOrNumber& lambda) {
         checkQubitRange(target, controls);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::RX, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::RX, std::vector{lambda});
     }
 
     void QuantumComputation::ry(Qubit target, const SymbolOrNumber& lambda) {
         checkQubitRange(target);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), target, qc::RY, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), target, qc::RY, std::vector{lambda});
     }
     void QuantumComputation::ry(Qubit target, const Control& control, const SymbolOrNumber& lambda) {
         checkQubitRange(target, control);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::RY, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::RY, std::vector{lambda});
     }
     void QuantumComputation::ry(Qubit target, const Controls& controls, const SymbolOrNumber& lambda) {
         checkQubitRange(target, controls);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::RY, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::RY, std::vector{lambda});
     }
 
     void QuantumComputation::rz(Qubit target, const SymbolOrNumber& lambda) {
         checkQubitRange(target);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), target, qc::RZ, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), target, qc::RZ, std::vector{lambda});
     }
     void QuantumComputation::rz(Qubit target, const Control& control, const SymbolOrNumber& lambda) {
         checkQubitRange(target, control);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::RZ, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), control, target, qc::RZ, std::vector{lambda});
     }
     void QuantumComputation::rz(Qubit target, const Controls& controls, const SymbolOrNumber& lambda) {
         checkQubitRange(target, controls);
         addVariables(lambda);
-        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::RZ, lambda);
+        emplace_back<SymbolicOperation>(getNqubits(), controls, target, qc::RZ, std::vector{lambda});
     }
 
     // Instantiates this computation
