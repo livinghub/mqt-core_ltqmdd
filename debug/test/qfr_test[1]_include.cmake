@@ -1,0 +1,5 @@
+if(EXISTS "/home/eli/gitDir/qfr/debug/test/qfr_test[1]_tests.cmake")
+  include("/home/eli/gitDir/qfr/debug/test/qfr_test[1]_tests.cmake")
+else()
+  add_test(qfr_test_NOT_BUILT qfr_test_NOT_BUILT)
+endif()

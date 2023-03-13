@@ -678,6 +678,353 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 		return e;
 	}
 
+	std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> QuantumComputation::buildFunctionalityFlat(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn) {
+		if (nqubits + nancillae == 0)
+			return {dd->DDone, {0,0}};
+		
+		std::array<short, MAX_QUBITS> line{};
+		line.fill(LINE_DEFAULT);
+		permutationMap map = initialLayout;
+		if(!mapIn.empty())
+			map = mapIn;
+	
+		dd->setMode(dd::Matrix);
+		// dd::Edge e = createInitialMatrix(dd);
+		dd::Edge e;
+
+		std::stack<dd::Edge> st1, st2;
+		
+		for(uint32_t opind=0; opind<ops.size(); ++opind) {
+			auto te = ops[opind]->getDD(dd, line, map);
+			dd->incRef(te);
+			st1.push(te);
+		} 
+		uint32_t qubitNums = st1.top().p->v, opNums = st1.size();
+		while(st1.size()>1 || st2.size()>1) {
+			while(!st1.empty()) {
+				auto e1 = st1.top();
+				st1.pop();
+				if(st1.empty()) {
+					st2.push(e1);
+					break;
+				}
+				auto e2 = st1.top();
+				st1.pop();
+				auto te = dd->multiply(e1, e2);
+				dd->incRef(te);
+				dd->decRef(e1);
+				dd->decRef(e2);
+				dd->garbageCollect();
+
+				st2.push(te);
+			}
+			while(!st2.empty()) {
+				auto e1 = st2.top();
+				st2.pop();
+				if(st2.empty()) {
+					st1.push(e1);
+					break;
+				}
+				auto e2 = st2.top();
+				st2.pop();
+				auto te = dd->multiply(e2, e1);
+				dd->incRef(te);
+				dd->decRef(e1);
+				dd->decRef(e2);
+				dd->garbageCollect();
+
+				st1.push(te);
+			}
+		}
+		if(st1.size()==1 && st2.empty()) {
+			e = st1.top();
+		} else if(st2.size()==1 && st1.empty()) {
+			e = st2.top();
+		} else {
+			throw std::logic_error("buildFunctionalityFlat error");
+		}
+
+		// correct permutation if necessary
+		// changePermutation(e, map, outputPermutation, line, dd);
+		mapIn = map;
+		e = reduceAncillae(e, dd);
+
+		return {e, {qubitNums, opNums}};
+	}
+
+	// 仍有问题需要解决
+	// 
+	std::pair<dd::Edge, permutationMap> QuantumComputation::buildFunFlatDyn(std::unique_ptr<dd::Package>& dd, dd::dynBuildStrat strat, permutationMap mapIn) {
+		if (nqubits + nancillae == 0)
+			return {dd->DDone, initialLayout};
+		
+		std::array<short, MAX_QUBITS> line{};
+		line.fill(LINE_DEFAULT);
+		permutationMap map = initialLayout;
+		if(strat == dd::dynBuildStrat::GoodOrderLS)		
+			map = mapIn;
+		dd->setMode(dd::Matrix);
+		dd::Edge e = createInitialMatrix(dd);
+		// dd::Edge e;
+
+		std::deque<dd::Edge> st1, st2;
+		st1.push_back(e);
+		
+		for(uint32_t opind=0; opind<ops.size(); ++opind) {
+			auto te = ops[opind]->getDD(dd, line, map);
+			dd->incRef(te);
+			st1.push_back(te);
+		} 
+		while(st1.size()>1 || st2.size()>1) {
+			// std::cout<<dd->activeNodeCount<<' ';
+			// std::clog<<st1.size()<<','<<dd->size(st1.front())<<' ';
+			if(dd->activeNodeCount > 200000) {
+				std::cout<<"OM"<<std::endl;
+				throw std::overflow_error("nodes > 200000");
+			}
+			
+			// std::cout<<dd->activeNodeCount<<' ';
+			if(strat == dd::dynBuildStrat::Sifting) {
+				// dd->dynSifting(e, map);
+				dd->dynLinearSifting(e, map, true);
+			} else if(strat == dd::dynBuildStrat::LinearSift) {
+				dd->dynLinearSifting(e, map);
+			} else if(strat == dd::dynBuildStrat::SiftingConv) {
+				auto preSize = 0;
+				while(preSize != dd->size(e)) {
+					preSize = dd->size(e);
+					// dd->dynSifting(e, map);
+					dd->dynLinearSifting(e, map, true);
+				}
+			} else if(strat == dd::dynBuildStrat::LinearSiftConv ) {
+				auto preSize = 0;
+				while(preSize != dd->size(e)) {
+					preSize = dd->size(e);
+					dd->dynLinearSifting(e, map);
+					// std::clog<<dd->size(e)<<' ';
+				}
+			}
+			
+			while(!st1.empty()) {
+				auto e1 = st1.front();
+				st1.pop_front();
+				if(st1.empty()) {
+					st2.push_back(e1);
+					break;
+				}
+				auto e2 = st1.front();
+				st1.pop_front();
+				if(st1.empty() && st2.empty()) {
+					std::clog<<dd->size(e1)<<'*'<<dd->size(e2)<<std::endl;
+				}
+				auto te = dd->multiply(e1, e2);
+				if(st1.empty() && st2.empty()) {
+					std::clog<<dd->size(e1)<<'*'<<dd->size(e2)<<'='<<dd->size(te)<<std::endl;
+				}
+				dd->incRef(te);
+				dd->decRef(e1);
+				dd->decRef(e2);
+				// dd->garbageCollect();
+
+				st2.push_back(te);
+			}
+			dd->garbageCollect();
+
+			if(strat == dd::dynBuildStrat::Sifting) {
+				// dd->dynSifting(e, map);
+				dd->dynLinearSifting(e, map, true);
+			} else if(strat == dd::dynBuildStrat::LinearSift) {
+				dd->dynLinearSifting(e, map);
+			} else if(strat == dd::dynBuildStrat::SiftingConv) {
+				auto preSize = 0;
+				while(preSize != dd->size(e)) {
+					preSize = dd->size(e);
+					// dd->dynSifting(e, map);
+					dd->dynLinearSifting(e, map, true);
+				}
+			} else if(strat == dd::dynBuildStrat::LinearSiftConv ) {
+				auto preSize = 0;
+				while(preSize != dd->size(e)) {
+					preSize = dd->size(e);
+					dd->dynLinearSifting(e, map);
+					// std::clog<<dd->size(e)<<' ';
+				}
+			}
+			while(!st2.empty()) {
+				auto e1 = st2.front();
+				st2.pop_front();
+				if(st2.empty()) {
+					st1.push_back(e1);
+					break;
+				}
+				auto e2 = st2.front();
+				st2.pop_front();
+				auto te = dd->multiply(e1, e2);
+				dd->incRef(te);
+				dd->decRef(e1);
+				dd->decRef(e2);
+				// dd->garbageCollect();
+
+				st1.push_back(te);
+			}
+			dd->garbageCollect();
+		}
+		
+		// dd->decRef(e);
+		// dd->garbageCollect();
+		// std::cout<<dd->activeNodeCount<<' ';
+		if(st1.size()==1 && st2.empty()) {
+			e = st1.front();
+		} else if(st2.size()==1 && st1.empty()) {
+			e = st2.front();
+		} else {
+			throw std::logic_error("buildFunctionalityFlat error");
+		}
+
+		if(strat == dd::dynBuildStrat::Sifting) {
+			// dd->dynSifting(e, map);
+			dd->dynLinearSifting(e, map, true);
+		} else if(strat == dd::dynBuildStrat::LinearSift) {
+			dd->dynLinearSifting(e, map);
+		} else if(strat == dd::dynBuildStrat::SiftingConv) {
+			auto preSize = 0;
+			while(preSize != dd->size(e)) {
+				preSize = dd->size(e);
+				// dd->dynSifting(e, map);
+				dd->dynLinearSifting(e, map, true);
+			}
+		} else if(strat == dd::dynBuildStrat::LinearSiftConv 
+		|| strat==dd::dynBuildStrat::SiftingThenLS || strat==dd::dynBuildStrat::GoodOrderLS) {
+			auto preSize = 0;
+			while(preSize != dd->size(e)) {
+				preSize = dd->size(e);
+				dd->dynLinearSifting(e, map);
+				// std::clog<<dd->size(e)<<' ';
+			}
+		}
+
+		// correct permutation if necessary
+		// changePermutation(e, map, outputPermutation, line, dd);
+		e = reduceAncillae(e, dd);
+
+		return {e, map};
+	}
+
+
+	std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> QuantumComputation::buildFunDyn(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn, dd::dynBuildStrat strat) {
+		if (nqubits + nancillae == 0)
+			return {dd->DDone, {0,0}};
+		
+		std::array<short, MAX_QUBITS> line{};
+		line.fill(LINE_DEFAULT);
+		permutationMap map = initialLayout;
+		if(strat == dd::dynBuildStrat::GoodOrderLS || strat == dd::dynBuildStrat::InOrder)		
+			map = mapIn;
+		dd->setMode(dd::Matrix);
+		dd::Edge e = createInitialMatrix(dd);
+
+		auto dd_new = std::make_unique<dd::Package>();
+		std::queue<dd::Edge> mydeq;
+		bool txMat[MAX_QUBITS][MAX_QUBITS]; //行列是var
+		permutationMap newMap = initialLayout;
+		dd_new->xorInit(initialLayout, txMat);
+		for (auto & op : ops) {
+			dd::Edge newDD = op->getDD(dd_new, line, initialLayout);
+			dd_new->incRef(newDD);
+			mydeq.push(newDD);
+		}
+		uint32_t qubitN = e.p->v+1, opN = mydeq.size();
+
+		uint32_t preSize = 64;
+		while(!mydeq.empty()) {
+			
+			auto newDD = mydeq.front();
+			// std::clog<<newDD.p->v<<',';
+			dd_new->opSeq = dd->opSeq;
+			dd_new->qmdd2ltqmdd(newDD, newMap, txMat);
+			dd->opSeq.clear();
+			// newDD = dd_new->renormalize(newDD);
+
+			auto nextDD = dd->depthCopyDD(newDD);
+			// dd->incRef(nextDD);
+			dd_new->decRef(newDD);
+			mydeq.pop();
+			dd_new->garbageCollect();
+			// std::clog<<dd->size(nextDD)<<std::endl;
+
+
+			auto tmp = dd->multiply(nextDD, e);
+			// dd->decRef(nextDD);
+			dd->incRef(tmp);
+			dd->decRef(e);
+			e = tmp;
+			// std::clog<<dd->size(e)<<std::endl;
+			
+			dd->garbageCollect();
+
+			// std::clog<<dd->size(e)<<",";
+			if(strat!=dd::dynBuildStrat::None
+			&& strat!=dd::dynBuildStrat::GoodOrderLS
+			&& dd->size(e) > (preSize<<1)) {
+
+				if(strat == dd::dynBuildStrat::Sifting) {
+					dd->dynSifting(e, map);
+					// dd->dynLinearSifting(e, map, true);
+				} else if(strat == dd::dynBuildStrat::LinearSift) {
+					dd->dynLinearSifting(e, map);
+				} else if(strat == dd::dynBuildStrat::SiftingConv) {
+					while(preSize != dd->size(e)) {
+						preSize = dd->size(e);
+						dd->dynSifting(e, map);
+						// dd->dynLinearSifting(e, map, true);
+					}
+				} else if(strat == dd::dynBuildStrat::LinearSiftConv) {
+					while(preSize != dd->size(e)) {
+						preSize = dd->size(e);
+						dd->dynLinearSifting(e, map);
+						// std::clog<<dd->size(e)<<' ';
+					}
+				}
+
+				preSize = dd->size(e);
+			}
+			
+			
+			
+		}
+		// std::clog<<std::endl<<dd->size(e)<<std::endl;
+		
+
+		if(strat == dd::dynBuildStrat::Sifting) {
+			dd->dynSifting(e, map);
+			// dd->dynLinearSifting(e, map, true);
+		} else if(strat == dd::dynBuildStrat::LinearSift) {
+			dd->dynLinearSifting(e, map);
+		} else if(strat == dd::dynBuildStrat::SiftingConv) {
+			preSize = 0;
+			while(preSize != dd->size(e)) {
+				preSize = dd->size(e);
+				dd->dynSifting(e, map);
+				// dd->dynLinearSifting(e, map, true);
+			}
+		} else if(strat == dd::dynBuildStrat::LinearSiftConv 
+		|| strat==dd::dynBuildStrat::SiftingThenLS || strat==dd::dynBuildStrat::GoodOrderLS) {
+			preSize = 0;
+			while(preSize != dd->size(e)) {
+				preSize = dd->size(e);
+				dd->dynLinearSifting(e, map);
+				// std::clog<<dd->size(e)<<' ';
+			}
+		}
+
+		// correct permutation if necessary
+		// changePermutation(e, map, outputPermutation, line, dd);
+		mapIn = map;
+		e = reduceAncillae(e, dd);
+
+		return {e, {qubitN, opN}};
+	}
+
 
 	dd::Edge QuantumComputation::buildFunctionality(std::unique_ptr<dd::Package>& dd) {
 		if (nqubits + nancillae == 0)
@@ -716,22 +1063,30 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 		std::array<short, MAX_QUBITS> line{};
 		line.fill(LINE_DEFAULT);
 		permutationMap map = initialLayout;
-		int curSize = 0;
+		int curSize = 64;
 
 		dd->setMode(dd::Matrix);
 		dd::Edge e = createInitialMatrix(dd);
 
+		auto dd_new = std::make_unique<dd::Package>();
+		std::queue<dd::Edge> mydeq;
+		bool txMat[MAX_QUBITS][MAX_QUBITS]; //行列是var
+		permutationMap newMap = initialLayout;
+		dd_new->xorInit(initialLayout, txMat);
 		for (auto & op : ops) {
-			auto dd_new = std::make_unique<dd::Package>();
-			auto newDD = op->getDD(dd_new, line, initialLayout);
+			dd::Edge newDD = op->getDD(dd_new, line, initialLayout);
 			dd_new->incRef(newDD);
+			mydeq.push(newDD);
+		}
 
-			bool txMat[MAX_QUBITS][MAX_QUBITS]; //行列是var
-			permutationMap newMap = initialLayout;
-			// dd_new->xorInit(initialLayout, txMat);
+		while(!mydeq.empty()) {
+			
+			auto newDD = mydeq.front();
+			std::clog<<newDD.p->v<<','<<dd_new->size(newDD)<<',';
 			dd_new->opSeq = dd->opSeq;
 			dd_new->qmdd2ltqmdd(newDD, newMap, txMat);
-			// newDD = dd_new->renormalize(newDD);
+			dd->opSeq.clear();
+			newDD = dd_new->renormalize(newDD);
 
 			// if(newMap != map) {
 			// 	printPermutationMap(newMap);
@@ -740,51 +1095,32 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 			// }
 
 			auto nextDD = dd->depthCopyDD(newDD);
-			dd->incRef(nextDD);
+			// dd->incRef(nextDD);
 
 			dd_new->decRef(newDD);
+			mydeq.pop();
 			dd_new->garbageCollect();
 			
 			// std::clog<<dd->size(nextDD)<<std::endl;
 
-			
-
-
-			// auto nextDD2 = op->getDD(dd, line, map);
-			// // nextDD2 = dd->renormalize(nextDD2);
-			// if(!dd->equals(nextDD, nextDD2)) {
-			// 	// dd->printDD(nextDD, 50);
-			// 	// dd->printDD(nextDD2, 50);
-			// 	std::cout<<"DD不等"<<std::endl;
-			// 	throw std::logic_error("DD不等");
-			// } 
-
-			//错误的
-			// auto nextDD = op->getDD(dd, line, initialLayout);
-			// dd->incRef(nextDD);
-			// bool txMat[MAX_QUBITS][MAX_QUBITS]; //行列是var
-			// permutationMap newMap = initialLayout;
-			// dd->xorInit(initialLayout, txMat);
-			// dd->qmdd2ltqmdd(nextDD, newMap, txMat);
-			// dd->decRef(nextDD);
 
 
 			auto tmp = dd->multiply(nextDD, e);
-			dd->decRef(nextDD);
+			// dd->decRef(nextDD);
 			dd->incRef(tmp);
 			dd->decRef(e);
 			e = tmp;
 			
 			dd->garbageCollect();
 
-			// std::clog<<dd->size(e)<<std::endl;
-			if(dd->size(e) - curSize > dd->dynThreshold) {
+			std::clog<<dd->size(e)<<std::endl;
+			if(dd->size(e) > curSize<<1) {
 				// std::clog<<dd->size(e)<<' ';
 				// // e = dd->dynTraceBack(e, map);
 				// std::clog<<dd->size(e)<<std::endl;
-				curSize = dd->size(e);
 
 				e = dd->linearAndSiftingAux(e, map, 1);
+				curSize = dd->size(e);
 				// std::clog<<dd->size(e)<<std::endl;
 				
 			}
@@ -793,6 +1129,7 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 			
 		}
 		e = dd->linearAndSiftingAux(e, map, 1);
+		std::clog<<dd->size(e)<<std::endl;
 		theMap = map;
 		// printPermutationMap(map);
 
@@ -855,50 +1192,46 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 
 	}
 
-	dd::Edge QuantumComputation::buildFunctionality(std::unique_ptr<dd::Package>& dd, permutationMap map) {
+	std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> QuantumComputation::buildFunctionality(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn) {
 		if (nqubits + nancillae == 0)
-			return dd->DDone;
+			return {dd->DDone, {0,0}};
 		
 		std::array<short, MAX_QUBITS> line{};
 		line.fill(LINE_DEFAULT);
-		// permutationMap map = initialLayout;
-		permutationMap initMap = initialLayout;
+		permutationMap map = initialLayout;
+		if(!mapIn.empty()) map = mapIn;
 
 		dd->setMode(dd::Matrix);
 		dd::Edge e = createInitialMatrix(dd);
+		uint32_t qubitsN = initialLayout.size(), opN = ops.size();
+		// return {e, {qubitsN, opN}};
 
 		for (auto & op : ops) {
-			auto newdd = op->getDD(dd, line, map);
-			dd->incRef(newdd);
-			auto tmp = dd->multiply(newdd, e);
-			dd->decRef(newdd);
+			auto tmp = dd->multiply(op->getDD(dd, line, map), e);
 
 			dd->incRef(tmp);
 			dd->decRef(e);
 			e = tmp;
 
 			dd->garbageCollect();
+
+			if(dd->size(e) > 200000) throw std::logic_error("nodes too more\n");
 		}
 		
 		// correct permutation if necessary
 		// changePermutation(e, map, outputPermutation, line, dd);
 		// changePermutation(e, initMap, map, line, dd);
 		e = reduceAncillae(e, dd);
+		mapIn = map;
 
-		return e;
+		return {e, {qubitsN, opN}};
 	}
 
 
 	//编译是采用动态最小化，默认方法为sifting
-	dd::Edge QuantumComputation::buildFunctionalityMin(std::unique_ptr<dd::Package>& dd) {
-		unsigned int threshold(1000), esize(0);
-		permutationMap newMap;
-		bool txMat[MAX_QUBITS][MAX_QUBITS] {}; //行列是var
-		
-
-
+	std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> QuantumComputation::buildFunctionalityMin(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn) {
 		if (nqubits + nancillae == 0)
-			return dd->DDone;
+			return {dd->DDone, {0,0}};
 		
 		std::array<short, MAX_QUBITS> line{};
 		line.fill(LINE_DEFAULT);
@@ -906,87 +1239,42 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 		dd->setMode(dd::Matrix);
 		dd::Edge e = createInitialMatrix(dd);
 
-		//动态最小化
-		// dd::Edge newdd;
-		// permutationMap newMap;
-		dd->xorInit(initialLayout);
-		dd->xorInit(initialLayout, txMat);
+		uint32_t qubitsN = initialLayout.size(), opN = ops.size();
+
+		std::deque<dd::Edge> DDdeq;
 		for (auto & op : ops) {
-			//拿出一个新的dd
-			newMap = initialLayout;
+			auto tmp = op->getDD(dd, line, map);
+			dd->incRef(tmp);
+			DDdeq.push_back(tmp);
+		}
 
-			auto newdd = op->getDD(dd, line, newMap);
-			// newdd = op->getDD(dd, line, map);
-			std::clog<<std::endl<<"新dd的大小:"<<dd->size(newdd)<<std::endl;
-			// dd->printOpSeq(dd->opSequence);
+		uint32_t threshold=100;
+		while(!DDdeq.empty()) {
+			auto tmp = dd->multiply(DDdeq.front(), e);
 
-			dd->xorInit(initialLayout, txMat);
-			dd->qmdd2ltqmdd(newdd, newMap, txMat);
+			dd->incRef(tmp);
+			dd->decRef(e);
+			dd->decRef(DDdeq.front());
+			DDdeq.pop_front();
+			e = tmp;
 
-			std::clog<<std::endl<<"qmdd->ltqmdd转换后:"<<dd->size(newdd)<<std::endl;
-			printPermutationMap(map);
-			dd->printLTMap(map);
-			printPermutationMap(newMap);
-			dd->printLTMap(newMap, txMat);
-			
-			// if(map == newMap) {
-			if(dd->matIsEqual(txMat)) {
-				auto tmp = dd->multiply(newdd, e);
-				dd->incRef(tmp);
-				dd->decRef(e);
-				e = tmp;
-				dd->garbageCollect();
-				std::clog<<std::endl<<"乘法后的size:"<<dd->size(e)<<std::endl;
-			} else {
-				// dd->printIndToVar(map);
-				// dd->printLTMap(map);
-				// dd->printIndToVar(newMap);
-				// dd->printLTMap(newMap, txMat);
-				throw std::logic_error("两个DD变量序不一致，不能执行乘法，请检查");
-			}
-			
-			// auto tmp = dd->multiply(op->getDD(dd, line, map), e);
+			dd->garbageCollect();
 
-			
-			if(dd->size(e) > threshold)
+			auto esize = dd->size(e);
+			std::clog<<esize<<' ';
+			if(esize > threshold)
 			{
-				// esize = dd->size(e);
-				// threshold = esize*0.6;
 				
-				auto tmp = dd->dynamicReorder(e, map, dd::DynamicReorderingStrategy::linearSift);
-				dd->incRef(tmp);
-				dd->decRef(e);
-				e = tmp;
-				// e = dd->dynamicReorder(e, map, dd::DynamicReorderingStrategy::Sifting);
-				//dd->printLTMap(map);
-				esize = dd->size(e);
-				threshold = esize<<1;
-				// std::cout << "**********动态调用********" <<  std::endl << "阀值：" << threshold << std::endl;
-				//printPermutationMap(map);
-				std::cout<<std::endl;
-				//dd->printInformation();
+				// dd->dynamicReorder(e, map, dd::DynamicReorderingStrategy::linearSift);
+				dd->linearAndSiftingAux(e, map, true);
+				threshold = (dd->size(e)<<1);
 				
 			}
 			
 		}
-		// int old_lssize = 0;
-		// for(int i=0; i<30; ++i)
-		// {
-		// 	auto ltreod = e = dd->dynamicReorder(e, map, dd::DynamicReorderingStrategy::linearSift);
-		// 	auto lt_size = dd->size(ltreod);
-		// 	if(lt_size == old_lssize) {
-		// 		break;
-		// 	} else {
-		// 		old_lssize = lt_size;
-		// 	}
-		// }
-		
-		// std::clog << std::endl << "动态最小化结束" << std::endl << "大小为：" << dd->size(e) << std::endl;
-		// printPermutationMap(outputPermutation);
-		outputPermutation = map;
-
+		mapIn = map;
 		// correct permutation if necessary
-		changePermutation(e, map, outputPermutation, line, dd);
+		// changePermutation(e, map, outputPermutation, line, dd);
 		//changePermutation(e, outputPermutation, map, line, dd);
 		// std::clog << "大小1为：" << dd->size(e) << std::endl;
 		// printPermutationMap(map);
@@ -994,133 +1282,10 @@ dd::Edge QuantumComputation::reduceAncillae(dd::Edge& e, std::unique_ptr<dd::Pac
 		e = reduceAncillae(e, dd);
 		// std::clog << "大小2为：" << dd->size(e) << std::endl;
 
-		return e;
+		return {e, {qubitsN, opN}};
 	}
 
-/*	//编译是采用动态最小化，默认方法为sifting
-	dd::Edge QuantumComputation::buildFunctionalityMin(std::unique_ptr<dd::Package>& dd) {
-		unsigned int threshold(100), esize(0);
-		permutationMap newMap;
-		// dd::Edge newdd;
-		bool txMat[MAX_QUBITS][MAX_QUBITS] {}; //行列是var
-		
 
-
-		if (nqubits + nancillae == 0)
-			return dd->DDone;
-		
-		std::array<short, MAX_QUBITS> line{};
-		line.fill(LINE_DEFAULT);
-		permutationMap map = initialLayout;
-		dd->setMode(dd::Matrix);
-		dd::Edge e = createInitialMatrix(dd);
-		dd::Edge minE = createInitialMatrix(dd);
-
-		//动态最小化
-		// dd::Edge newdd;
-		// permutationMap newMap;
-		dd->xorInit(initialLayout);
-		dd->xorInit(initialLayout, txMat);
-		bool fg = 0;
-		for (auto & op : ops) {
-			//拿出一个新的dd
-			
-			
-			// std::clog << "001 ";
-
-			if(fg == 0) {
-				newMap = initialLayout;
-				auto newdd = op->getDD(dd, line, newMap);
-				auto tmp = dd->multiply(newdd, minE);
-				dd->incRef(tmp);
-				dd->decRef(minE);
-				dd->garbageCollect();
-				minE = tmp;
-				if(dd->size(minE) >= threshold) {
-					fg = 1;
-					std::clog << "me-size: " << dd->size(minE)<<' ';
-					auto tmp0 = dd->dynamicReorder(minE, map, dd::DynamicReorderingStrategy::linearSift);
-					dd->incRef(tmp0);
-					dd->decRef(minE);
-					dd->garbageCollect();
-					minE = tmp0;
-				}	
-				// std::clog << "002 ";
-			} else {
-				newMap = initialLayout;
-				auto newdd = op->getDD(dd, line, newMap);
-				// e = createInitialMatrix(dd);
-				auto tmp = dd->multiply(newdd,e);
-				dd->incRef(tmp);
-				dd->decRef(e);
-				dd->garbageCollect();
-				e = tmp;
-				
-				std::clog << "003 ";
-			}
-			if(fg && dd->size(e) >= dd->size(minE)) {
-				std::clog << "004 ";
-				dd->xorInit(initialLayout, txMat);
-				dd->qmdd2ltqmdd(e, newMap, dd->opSequence, txMat);
-				if(dd->matIsEqual(txMat)) {
-					auto tmp = dd->multiply(e, minE);
-					dd->incRef(tmp);
-					dd->decRef(minE);
-					// dd->decRef(e);
-					e = createInitialMatrix(dd);
-					dd->garbageCollect();
-					auto tmp0 = dd->dynamicReorder(tmp, map, dd::DynamicReorderingStrategy::linearSift);
-					dd->incRef(tmp0);
-					dd->decRef(tmp);
-					dd->garbageCollect();
-					minE = tmp0;
-				} else {
-					dd->printLTMap(map);
-					dd->printLTMap(newMap, txMat);
-					throw std::logic_error("两个DD变量序不一致，不能执行乘法，请检查");
-				}
-				
-				
-			}
-			// std::clog << "005 ";
-			dd->garbageCollect();
-			// std::clog << "006 ";
-		}
-		std::clog << "e-size: " << dd->size(e)<<' ';
-		dd->xorInit(initialLayout, txMat);
-		dd->qmdd2ltqmdd(e, newMap, dd->opSequence, txMat);
-		dd->garbageCollect();
-		if(dd->matIsEqual(txMat)) {
-			auto tmp = dd->multiply(e, minE);
-			dd->incRef(tmp);
-			dd->decRef(minE);
-			minE = tmp;
-			dd->garbageCollect();
-			// minE = dd->dynamicReorder(minE, map, dd::DynamicReorderingStrategy::linearSift);
-			dd->decRef(e);
-			dd->garbageCollect();
-		} else {
-			dd->printLTMap(map);
-			dd->printLTMap(newMap, txMat);
-			throw std::logic_error("两个DD变量序不一致，不能执行乘法，请检查");
-		}
-		
-		std::clog << "me-e-size: " << dd->size(minE)<<' '<<dd->size(e)<<' ';
-
-		outputPermutation = map;
-
-		// correct permutation if necessary
-		changePermutation(minE, map, outputPermutation, line, dd);
-		//changePermutation(e, outputPermutation, map, line, dd);
-		// std::clog << "大小1为：" << dd->size(e) << std::endl;
-		// printPermutationMap(map);
-		// printPermutationMap(outputPermutation);
-		minE = reduceAncillae(minE, dd);
-		// std::clog << "大小2为：" << dd->size(e) << std::endl;
-
-		return minE;
-	}
-*/
 	dd::Edge QuantumComputation::simulate(const dd::Edge& in, std::unique_ptr<dd::Package>& dd) {
 		// measurements are currently not supported here
 		std::array<short, MAX_QUBITS> line{};

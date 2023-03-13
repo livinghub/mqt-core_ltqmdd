@@ -7,11 +7,17 @@
 #include "algorithms/QFT.hpp"
 #include "algorithms/Grover.hpp"
 #include "algorithms/GoogleRandomCircuitSampling.hpp"
+#include <ctime>
 
 using namespace std;
 using namespace chrono;
 
+
 int main(int argc, char *argv[]) {
+
+	
+	clock_t start,end;
+	double endtime;
 
 	//读取real文件
 	std::string fileName = "./circuits/test.real";
@@ -22,105 +28,107 @@ int main(int argc, char *argv[]) {
  	}
 	else fileName = argv[1];
 
-	std::cout << std::endl << std::endl << "********************" << std::endl << "电路：" << fileName << std::endl;
+	// std::cout << std::endl << std::endl << "********************" << std::endl << "电路：" << fileName << std::endl;
 	qc::QuantumComputation qc(fileName);
-
-	// auto dd = make_unique<dd::Package>(); // create an instance of the DD package
-	// auto functionality = qc.buildFunctionality(dd);
-	// //qc.printMatrix(dd, functionality, std::cout); //输出矩阵
-	// // dd::export2Dot(functionality, "test-real.dot"); //输出QMDD表示文件
-	// std::cout << "原始dd大小：" << dd->size(functionality) << std::endl; //输出原始dd的大小
-
-	// qc::permutationMap varMap = qc.initialLayout; //复制电路的初始变量映射
-	// // qc.printPermutationMap(varMap); //打印初始映射
-
-	// // 调用sifting重排算法
-	// auto reorderdd = dd->dynamicReorder(functionality, varMap, dd::DynamicReorderingStrategy::Sifting);
-	// //qc.printMatrix(dd, reorderdd, std::cout); //输出矩阵
-	// // dd::export2Dot(reorderdd, "reorderdd.dot"); //输出QMDD表示文件
-	// int sifting_size = dd->size(reorderdd);
-	// std::cout << "Sifting后dd大小：" << sifting_size << std::endl; //输出重排后dd的大小
-	// qc.printPermutationMap(varMap); //输出重排后的变量映射关系
+	//qc::QFT qc(16);
 
 
-	// //sifting 到收敛
-	// for(int convs=0; convs!=sifting_size;)
-	// {
-	// 	convs=sifting_size;
-	// 	reorderdd = dd->dynamicReorder(functionality, varMap, dd::DynamicReorderingStrategy::Sifting);
-	// 	sifting_size = dd->size(reorderdd);
-	// }
-	// std::cout << "Sifting收敛后dd大小：" << sifting_size << std::endl; //输出重排后dd的大小
-	// qc.printPermutationMap(varMap); //输出重排后的变量映射关系
 
-	// //变量序正确性测试
-	// auto siftdd = make_unique<dd::Package>(); // create an instance of the DD package
-	// auto siftf = qc.buildFunctionality(siftdd, varMap);
-	// std::cout << "变量序生成dd大小：" << siftdd->size(siftf) << std::endl; //输出重排后dd的大小
+	//创建一个dd实例
+	auto dd = make_unique<dd::Package>(); // create an instance of the DD package
+	auto functionality = qc.buildFunctionality(dd);
+	auto dd_size = dd->size(functionality);
+	//qc.printMatrix(dd, functionality, std::cout); //输出矩阵
+	//dd::export2Dot(functionality, "test-real.dot"); //输出QMDD表示文件
+	// std::cout << "原始dd大小：" << dd->size(functionality) << "    "; //输出原始dd的大小
 
+	qc::permutationMap varMap = qc.initialLayout; //复制电路的初始变量映射
 	
+	// qc.printPermutationMap(varMap); //打印初始映射
 
-	//新建一个dd
-	//qc::QuantumComputation qc2(fileName);
-	auto dd_new = make_unique<dd::Package>(); // create an instance of the DD package
-	auto functionality_new = qc.buildFunctionality(dd_new);
-	qc::permutationMap ltvarMap = qc.initialLayout;
-
-	// 调用lt重排算法
-	dd_new->xorInit(ltvarMap);
-	auto ltreod = dd_new->dynamicReorder(functionality_new, ltvarMap, dd::DynamicReorderingStrategy::linearSift);
+	// 调用sifting重排算法
+	// start=clock();
+	auto reorderdd = dd->dynamicReorder(functionality, varMap, dd::DynamicReorderingStrategy::Sifting);
+	// end=clock();
 	//qc.printMatrix(dd, reorderdd, std::cout); //输出矩阵
-	// dd::export2Dot(ltreod, "ltreod.dot"); //输出QMDD表示文件
-	int lt_size = dd_new->size(ltreod);
-	std::cout << "linearSifting后dd大小：" << lt_size << std::endl; //输出重排后dd的大小
-	qc.printPermutationMap(ltvarMap); //输出重排后的变量映射关系
-	dd_new->printLTMap(ltvarMap);
-	
+	//dd::export2Dot(reorderdd, "reorderdd.dot"); //输出QMDD表示文件
+	int sifting_size = dd->size(reorderdd);
+	int one_sifting_size = sifting_size;
+	// endtime=(double)(end-start)/CLOCKS_PER_SEC;
+	auto one_sifting_time = endtime;
 
-
-	//linearsifting 到收敛
-	for(int convs=0; convs!=lt_size;)
+	//sifting 到收敛
+	int old_size=0;
+	for(int i=0; i<30; ++i)
 	{
-		convs=lt_size;
-		ltreod = dd_new->dynamicReorder(functionality_new, ltvarMap, dd::DynamicReorderingStrategy::linearSift);
-		lt_size = dd_new->size(ltreod);
+		reorderdd = dd->dynamicReorder(reorderdd, varMap, dd::DynamicReorderingStrategy::Sifting);
+		sifting_size = dd->size(reorderdd);
+		if(sifting_size == old_size) {
+			break;
+		} else {
+			old_size = sifting_size;
+		}
 	}
-	std::cout << "Linear Sifting收敛后dd大小：" << lt_size << std::endl; //输出重排后dd的大小
-	qc.printPermutationMap(ltvarMap); //输出重排后的变量映射关系
-	dd_new->printLTMap(ltvarMap);
+	end=clock();
+	endtime=(double)(end-start)/CLOCKS_PER_SEC;
+	auto conv_sifting_time = endtime;
+	int conv_sifting_size = sifting_size;
+	cout<<fileName<<' '<<dd_size<<' '<<one_sifting_size<<' '<<one_sifting_time<<' '<<conv_sifting_size<<' '<<conv_sifting_time<<endl;
 	
 
-	// //变量序正确性测试
-	// auto lsdd = make_unique<dd::Package>(); // create an instance of the DD package
-	// auto lsf = qc.buildFunctionality(lsdd, ltvarMap);
-	// std::cout << "变量序生成dd大小：" << lsdd->size(lsf) << std::endl; //输出重排后dd的大小
+	// //新建一个dd_new实例
+	// //qc::QuantumComputation qc2(fileName);
+	// qc::permutationMap ltvarMap = qc.initialLayout;
+	// // qc::permutationMap ltvarMap = varMap;
+	// auto dd_new = make_unique<dd::Package>(); // create an instance of the DD package
+	// auto functionality_new = get<0>(qc.buildFunctionality(dd_new, ltvarMap));
+	// auto dd_size2 = dd_new->size(functionality_new);
+	// // std::cout << "原始dd大小：" << dd_size2 << "    ";
 
-	dd_new->printLTMap(ltvarMap);
-	dd_new->printLTMat(ltvarMap);
+	// // 调用linearsifting重排算法
+	// start=clock();
+	// auto ltreod = dd_new->dynamicReorder(functionality_new, ltvarMap, dd::DynamicReorderingStrategy::linearSifting);
+	// end=clock();
+	// //dd::export2Dot(ltreod, "ltreod.dot"); //输出QMDD表示文件
+	// int lt_size = dd_new->size(ltreod);
+	// auto one_lt_size = lt_size;
+	// // std::cout << "linearSifting后dd大小：" << one_lt_size << "    "; //输出重排后dd的大小
+	// endtime=(double)(end-start)/CLOCKS_PER_SEC;
+	// auto one_lt_time = endtime;
 
-	// //变量序下对应的矩阵
-	// bool tmpMat[128][128];
-	// dd_new->xorInit(ltvarMap, tmpMat);
-	// dd_new->printLTMap(ltvarMap, tmpMat);
-	// dd_new->printLTMat(ltvarMap, tmpMat);
+	// //linearsifting 到收敛
+	// int old_lssize = 0;
+	// for(int i=0; i<30; ++i)
+	// {
+	// 	ltreod = dd_new->dynamicReorder(ltreod, ltvarMap, dd::DynamicReorderingStrategy::linearSifting);
+	// 	lt_size = dd_new->size(ltreod);
+	// 	if(lt_size == old_lssize) {
+	// 		break;
+	// 	} else {
+	// 		old_lssize = lt_size;
+	// 	}
+	// }
+	// end=clock();
+	// endtime=(double)(end-start)/CLOCKS_PER_SEC;
+	// auto conv_lt_size = lt_size;
+	// auto conv_lt_time = endtime;
+	// cout<<fileName<<' '<<dd_size2<<' '<<dd_size2<<' '<<one_lt_size<<' '<<one_lt_time<<' '<<conv_lt_size<<' '<<conv_lt_time<<endl;
 
 
-	// //输出lt次数
-	// std::cout << "ex-count:" << dd_new->exchange_base_cases << ";	lt-count:" << dd_new->linear_in_place << std::endl;
-	// std::cout << "有效LT次数： " << dd_new->valid_LT_Num << std::endl;
+	//获取量子比特位和门数量
+	// qc::permutationMap ltvarMap = qc.initialLayout;
+	// auto dd_new = make_unique<dd::Package>(); // create an instance of the DD package
+	// auto functionality_new = qc.buildFunctionality(dd_new, ltvarMap);
+	// dd_new->xorInit(ltvarMap);
+	// dd_new->export2Dot(functionality_new.first, "test-real.dot");
+	// auto ltreod = dd_new->dynamicReorder(functionality_new.first, ltvarMap, dd::DynamicReorderingStrategy::linearSifting);
+	// ltreod = dd_new->dynamicReorder(ltreod, ltvarMap, dd::DynamicReorderingStrategy::linearSifting);
+	// dd_new->export2Dot(functionality_new.first, "test-real2.dot");
+	// dd_new->printLTMap(ltvarMap);
+	// dd_new->printLTMat(ltvarMap);
+	// cout<<fileName<<' '<<functionality_new.second.first<<' '<<functionality_new.second.second<<endl;
+
 	
-	//打印lt矩阵
-/*	for(int i=0; i<dd::MAXN; ++i)
-	{
-		for(int j=0; j<dd::MAXN; ++j) std::cout << dd->xorMat[i][j] << " ";
-		std::cout<<std::endl;
-	}	
-*/
-	//判断重排前后dd是否一致
-	//std::cout << "重排电路是否一致： " << dd->equals(functionality, reorderdd) << std::endl;
-
-	
-
 	return 0;
 }
 

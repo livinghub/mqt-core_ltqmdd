@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/qfr_app.dir/app.cpp.o  -o qfr_app  ../src/libqfr.a ../src/extern/dd_package/src/libdd_package.a 

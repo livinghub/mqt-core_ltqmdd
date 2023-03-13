@@ -182,10 +182,13 @@ namespace qc {
 			max_controls = std::max(ncontrols, max_controls);
 		}
 
+		virtual std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> buildFunctionalityFlat(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn);
+		virtual std::pair<dd::Edge, permutationMap> buildFunFlatDyn(std::unique_ptr<dd::Package>& dd, dd::dynBuildStrat strat=dd::dynBuildStrat::None, permutationMap mapIn={});
+		virtual std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> buildFunDyn(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn, dd::dynBuildStrat strat=dd::dynBuildStrat::None);
 		virtual dd::Edge buildFunctionality(std::unique_ptr<dd::Package>& dd);
-		virtual dd::Edge buildFunctionality(std::unique_ptr<dd::Package>& dd, permutationMap map);
+		virtual std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> buildFunctionality(std::unique_ptr<dd::Package>& dd, permutationMap &map);
 		//virtual dd::Edge buildFunctionalityMin(std::unique_ptr<dd::Package>& dd);
-		virtual dd::Edge buildFunctionalityMin(std::unique_ptr<dd::Package>& dd);
+		virtual std::pair<dd::Edge, std::pair<uint32_t, uint32_t>> buildFunctionalityMin(std::unique_ptr<dd::Package>& dd, permutationMap &mapIn);
 		virtual dd::Edge buildFunDynSift(std::unique_ptr<dd::Package>& dd, permutationMap& theMap);
 		virtual dd::Edge buildFunDynLinSift(std::unique_ptr<dd::Package>& dd, permutationMap& theMap);
 		virtual dd::Edge simulate(const dd::Edge& in, std::unique_ptr<dd::Package>& dd);
