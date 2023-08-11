@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
 	// 调用sifting重排算法
 	// start=clock();
-	auto reorderdd = dd->dynamicReorder(functionality, varMap, dd::DynamicReorderingStrategy::Sifting);
+	auto reorderdd = dd->dynamicReorder(functionality, varMap, dd::DynamicReorderingStrategy::mixlinearSifting);
 	// end=clock();
 	//qc.printMatrix(dd, reorderdd, std::cout); //输出矩阵
 	//dd::export2Dot(reorderdd, "reorderdd.dot"); //输出QMDD表示文件
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 	int old_size=0;
 	for(int i=0; i<30; ++i)
 	{
-		reorderdd = dd->dynamicReorder(reorderdd, varMap, dd::DynamicReorderingStrategy::Sifting);
+		reorderdd = dd->dynamicReorder(reorderdd, varMap, dd::DynamicReorderingStrategy::linearSifting);
 		sifting_size = dd->size(reorderdd);
 		if(sifting_size == old_size) {
 			break;
